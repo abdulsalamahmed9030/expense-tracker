@@ -233,7 +233,7 @@ export default function DashboardPage() {
               <div className="h-[220px] w-full sm:h-[260px]">
                 <TrendChart data={trendData} />
               </div>
-            )}
+            )} 
           </div>
 
           <div className="rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
