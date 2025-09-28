@@ -33,13 +33,19 @@ const formatINR = (n: number) =>
     maximumFractionDigits: 2,
   });
 
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
 export default function TransactionsPage() {
   const supabase = createSupabaseBrowserClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Build id -> category map
   const catMap = useMemo(() => {
     const m = new Map<string, Category>();
     for (const c of categories) m.set(c.id, c);
@@ -62,7 +68,6 @@ export default function TransactionsPage() {
       if (isMounted && cats) setCategories(cats as Category[]);
       setLoading(false);
 
-      // realtime for current user
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) return;
@@ -109,9 +114,78 @@ export default function TransactionsPage() {
         <AddTransactionModal />
       </div>
 
-      {/* Make table safe on phones: overflow-x-auto + no-wrap fixes */}
-      <div className="rounded-2xl border bg-card shadow-sm overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
+      {/* ---------- MOBILE: Card list (no horizontal scroll) ---------- */}
+      <div className="space-y-3 sm:hidden">
+        {loading &&
+          [...Array(5)].map((_, i) => (
+            <div key={i} className="rounded-2xl border bg-card shadow-sm p-4 space-y-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          ))}
+
+        {!loading &&
+          transactions.map((t) => {
+            const cat = t.category_id ? catMap.get(t.category_id) : null;
+            return (
+              <div key={t.id} className="rounded-2xl border bg-card shadow-sm p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">{fmtDate(t.occurred_at)}</div>
+                    <div className="text-base font-medium capitalize">{t.type}</div>
+                    <div className="pt-1">
+                      {cat ? (
+                        <CategoryPill name={cat.name} color={cat.color} />
+                      ) : (
+                        <span className="text-muted-foreground">Uncategorized</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-semibold tabular-nums whitespace-nowrap">
+                      ₹ {formatINR(Number(t.amount))}
+                    </div>
+                  </div>
+                </div>
+
+                {t.note && (
+                  <div className="mt-2 text-sm leading-relaxed break-words">
+                    {t.note}
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <EditTransactionModal transaction={t} />
+                  <DeleteTransactionButton id={t.id} />
+                </div>
+              </div>
+            );
+          })}
+
+        {!loading && transactions.length === 0 && (
+          <EmptyState
+            title="No transactions yet"
+            description="Add your first transaction to get started."
+            action={<AddTransactionModal />}
+          />
+        )}
+      </div>
+
+      {/* ---------- DESKTOP (sm+): Table ---------- */}
+      <div className="hidden sm:block rounded-2xl border bg-card shadow-sm">
+        <table className="w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-[16%]" />
+            <col className="w-[14%]" />
+            <col className="w-[22%]" />
+            <col className="w-[18%]" />
+            <col className="w-[20%]" />
+            <col className="w-[10%]" />
+          </colgroup>
+
           <thead className="border-b bg-muted/30">
             <tr>
               <th className="px-4 py-2 text-left">Date</th>
@@ -122,6 +196,7 @@ export default function TransactionsPage() {
               <th className="px-4 py-2 text-left">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {loading &&
               [...Array(5)].map((_, i) => (
@@ -139,10 +214,8 @@ export default function TransactionsPage() {
               transactions.map((t) => {
                 const cat = t.category_id ? catMap.get(t.category_id) : null;
                 return (
-                  <tr key={t.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      {new Date(t.occurred_at).toLocaleDateString()}
-                    </td>
+                  <tr key={t.id} className="border-b last:border-0 align-top">
+                    <td className="px-4 py-2 whitespace-nowrap">{fmtDate(t.occurred_at)}</td>
                     <td className="px-4 py-2 capitalize">{t.type}</td>
                     <td className="px-4 py-2">
                       {cat ? (
@@ -154,7 +227,7 @@ export default function TransactionsPage() {
                     <td className="px-4 py-2 tabular-nums whitespace-nowrap">
                       ₹ {formatINR(Number(t.amount))}
                     </td>
-                    <td className="px-4 py-2 max-w-[280px] truncate md:max-w-none">
+                    <td className="px-4 py-2 break-words">
                       {t.note ?? "-"}
                     </td>
                     <td className="px-4 py-2">
@@ -169,7 +242,7 @@ export default function TransactionsPage() {
 
             {!loading && transactions.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center">
+                <td colSpan={6} className="px-4 py-6">
                   <EmptyState
                     title="No transactions yet"
                     description="Add your first transaction to get started."
