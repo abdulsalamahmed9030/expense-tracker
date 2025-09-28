@@ -34,10 +34,17 @@ type AutoTableDoc = jsPDF & {
   };
 };
 
+// Indian-style number formatting
+const formatINR = (n: number) =>
+  Number(n || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 export function generateReportPDF(opts: {
   title?: string;
   from: string; // YYYY-MM-DD
-  to: string;   // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
   kpis: ReportKpis;
   categories: ReportCategoryRow[];
   transactions: ReportTxRow[];
@@ -71,9 +78,9 @@ export function generateReportPDF(opts: {
     head: [["Income", "Expense", "Net", "# Transactions"]],
     body: [
       [
-        `$${kpis.income.toFixed(2)}`,
-        `$${kpis.expense.toFixed(2)}`,
-        `$${kpis.net.toFixed(2)}`,
+        `Rs ${formatINR(kpis.income)}`,
+        `Rs ${formatINR(kpis.expense)}`,
+        `Rs ${formatINR(kpis.net)}`,
         `${kpis.count}`,
       ],
     ],
@@ -86,7 +93,7 @@ export function generateReportPDF(opts: {
     startY: nextY1,
     styles: { fontSize: 10 },
     head: [["Category", "Amount"]],
-    body: categories.map((c) => [c.name, `$${c.amount.toFixed(2)}`]),
+    body: categories.map((c) => [c.name, `Rs ${formatINR(c.amount)}`]),
     didDrawPage: (data) => {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
@@ -102,7 +109,7 @@ export function generateReportPDF(opts: {
     t.date,
     t.type,
     t.category,
-    `$${Number(t.amount).toFixed(2)}`,
+    `Rs ${formatINR(Number(t.amount))}`,
     t.note ?? "",
   ]);
 
