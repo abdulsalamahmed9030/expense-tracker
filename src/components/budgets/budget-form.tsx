@@ -1,19 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { budgetSchema, type BudgetInput } from "@/lib/validation/budget";
+import { z } from "zod";
+import { budgetSchema } from "@/lib/validation/budget";
 import { createBudget, updateBudget } from "@/app/(app)/budgets/actions";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-type Category = {
-  id: string;
-  name: string;
-  color: string | null;
-};
+type Category = { id: string; name: string; color: string | null };
+
+// ---- Form schema (add optional id + coerce numbers so resolver accepts strings) ----
+const budgetFormSchema = budgetSchema
+  .extend({ id: z.string().optional() })
+  .extend({
+    month: z.coerce.number().int().min(1).max(12),
+    year: z.coerce.number().int().min(1900),
+    amount: z.coerce.number().nonnegative(),
+  });
+
+type FormOutput = z.infer<typeof budgetFormSchema>; // after resolver (numbers)
+type FormInput  = z.input<typeof budgetFormSchema>; // before resolver (strings | numbers)
 
 const thisMonth = new Date();
 
@@ -22,23 +31,24 @@ export function BudgetForm({
   initialData,
 }: {
   onSuccess?: () => void;
-  initialData?: BudgetInput;
+  initialData?: Partial<FormOutput>;
 }) {
   const supabase = createSupabaseBrowserClient();
 
-  // ❌ Remove <BudgetInput> generic — let resolver handle it
+  // NOTE: 3 generics: <TFieldValues, TContext, TTransformedValues>
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm({
-    resolver: zodResolver(budgetSchema),
-    defaultValues: initialData ?? {
-      category_id: "",
-      month: thisMonth.getMonth() + 1,
-      year: thisMonth.getFullYear(),
-      amount: 0,
+  } = useForm<FormInput, unknown, FormOutput>({
+    resolver: zodResolver(budgetFormSchema),
+    defaultValues: {
+      id: initialData?.id,
+      category_id: initialData?.category_id ?? "",
+      month: initialData?.month ?? thisMonth.getMonth() + 1,
+      year: initialData?.year ?? thisMonth.getFullYear(),
+      amount: initialData?.amount ?? 0,
     },
   });
 
@@ -63,23 +73,31 @@ export function BudgetForm({
   }, [supabase]);
 
   useEffect(() => {
-    if (initialData) reset(initialData);
+    if (initialData) {
+      reset({
+        id: initialData.id,
+        category_id: initialData.category_id ?? "",
+        month: initialData.month ?? thisMonth.getMonth() + 1,
+        year: initialData.year ?? thisMonth.getFullYear(),
+        amount: initialData.amount ?? 0,
+      });
+    }
   }, [initialData, reset]);
 
-  const onSubmit = async (values: unknown) => {
+  // Submit expects the TRANSFORMED values (FormOutput)
+  const onSubmit: SubmitHandler<FormOutput> = async (values) => {
     setError(null);
     try {
-      // ✅ Parse with Zod to guarantee correct type
+      // Persist with your original schema (drops id if not in it)
       const parsed = budgetSchema.parse(values);
-
-      if (initialData?.id) {
+      if (values.id) {
         await updateBudget(parsed);
       } else {
         await createBudget(parsed);
       }
       reset();
       onSuccess?.();
-    } catch (e: unknown) {
+    } catch (e) {
       const message =
         e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
       setError(message);
@@ -93,9 +111,8 @@ export function BudgetForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {initialData?.id && <input type="hidden" {...register("id")} />}
+      {Boolean(initialData?.id) && <input type="hidden" {...register("id")} />}
 
-      {/* Category */}
       <div>
         <label className="text-sm font-medium">Category</label>
         <select
@@ -103,34 +120,27 @@ export function BudgetForm({
           className="w-full rounded-xl border px-3 py-2"
           disabled={loadingCats}
         >
-          <option value="">
-            {loadingCats ? "Loading..." : "Select category"}
-          </option>
+          <option value="">{loadingCats ? "Loading..." : "Select category"}</option>
           {!loadingCats &&
             categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
         </select>
-        {errors.category_id && (
-          <p className="text-sm text-red-500">{String(errors.category_id.message)}</p>
+        {errors.category_id?.message && (
+          <p className="text-sm text-red-500">{errors.category_id.message}</p>
         )}
       </div>
 
-      {/* Month + Year */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-sm font-medium">Month</label>
           <select {...register("month")} className="w-full rounded-xl border px-3 py-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
+              <option key={m} value={m}>{m}</option>
             ))}
           </select>
-          {errors.month && (
-            <p className="text-sm text-red-500">{String(errors.month.message)}</p>
+          {errors.month?.message && (
+            <p className="text-sm text-red-500">{errors.month.message}</p>
           )}
         </div>
 
@@ -138,34 +148,27 @@ export function BudgetForm({
           <label className="text-sm font-medium">Year</label>
           <select {...register("year")} className="w-full rounded-xl border px-3 py-2">
             {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
+              <option key={y} value={y}>{y}</option>
             ))}
           </select>
-          {errors.year && (
-            <p className="text-sm text-red-500">{String(errors.year.message)}</p>
+          {errors.year?.message && (
+            <p className="text-sm text-red-500">{errors.year.message}</p>
           )}
         </div>
       </div>
 
-      {/* Amount */}
       <div>
         <label className="text-sm font-medium">Amount</label>
-        <Input type="number" step="0.01" {...register("amount")} />
-        {errors.amount && (
-          <p className="text-sm text-red-500">{String(errors.amount.message)}</p>
+        <Input type="number" step="0.01" inputMode="decimal" {...register("amount")} />
+        {errors.amount?.message && (
+          <p className="text-sm text-red-500">{errors.amount.message}</p>
         )}
       </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting
-          ? "Saving..."
-          : initialData?.id
-          ? "Update Budget"
-          : "Save Budget"}
+        {isSubmitting ? "Saving..." : initialData?.id ? "Update Budget" : "Save Budget"}
       </Button>
     </form>
   );
