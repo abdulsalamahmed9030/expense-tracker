@@ -26,7 +26,6 @@ export default function CategoriesPage() {
     const init = async () => {
       setLoading(true);
 
-      // Load initial
       const { data, error } = await supabase
         .from("categories")
         .select("*")
@@ -35,7 +34,6 @@ export default function CategoriesPage() {
       if (!error && data) setCategories(data as Category[]);
       setLoading(false);
 
-      // Subscribe realtime
       channel = supabase
         .channel("categories-realtime")
         .on(
@@ -73,8 +71,8 @@ export default function CategoriesPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header: stack on mobile, row on sm+ */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {loading ? (
           <>
             <Skeleton className="h-7 w-40" />
@@ -83,21 +81,26 @@ export default function CategoriesPage() {
         ) : (
           <>
             <h1 className="text-2xl font-semibold">Categories</h1>
-            <AddCategoryModal />
+            <div className="w-full sm:w-auto">
+              <AddCategoryModal />
+            </div>
           </>
         )}
       </div>
 
-      {/* Loading grid skeleton */}
+      {/* Loading grid: 1 (mobile) → 2 (md) → 3 (lg) */}
       {loading && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded-xl border p-4 shadow-sm flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex min-w-0 items-center justify-between gap-2 rounded-xl border p-4 shadow-sm"
+            >
+              <div className="flex min-w-0 items-center gap-2">
                 <Skeleton className="h-6 w-6 rounded-full" />
                 <Skeleton className="h-4 w-24" />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Skeleton className="h-8 w-24" />
                 <Skeleton className="h-8 w-24" />
               </div>
@@ -112,28 +115,32 @@ export default function CategoriesPage() {
           <EmptyState
             title="No categories yet"
             description="Create categories to organize your expenses."
-            action={<AddCategoryModal />}
+            action={
+              <div className="w-full sm:w-auto">
+                <AddCategoryModal />
+              </div>
+            }
           />
         </div>
       )}
 
-      {/* Categories grid */}
+      {/* Categories grid: 1 (mobile) → 2 (md) → 3 (lg) */}
       {!loading && categories.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {categories.map((c) => (
             <div
               key={c.id}
-              className="flex items-center justify-between gap-2 rounded-xl border p-4 shadow-sm"
+              className="flex min-w-0 items-center justify-between gap-2 rounded-xl border p-4 shadow-sm"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <div
-                  className="h-6 w-6 rounded-full"
+                  className="h-6 w-6 flex-shrink-0 rounded-full"
                   style={{ backgroundColor: c.color }}
                   aria-label={`Category color ${c.color}`}
                 />
-                <span>{c.name}</span>
+                <span className="truncate">{c.name}</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <EditCategoryModal category={c} />
                 <DeleteCategoryButton id={c.id} />
               </div>
