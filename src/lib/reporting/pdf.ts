@@ -44,7 +44,7 @@ const formatINR = (n: number) =>
 export function generateReportPDF(opts: {
   title?: string;
   from: string; // YYYY-MM-DD
-  to: string; // YYYY-MM-DD
+  to: string;   // YYYY-MM-DD
   kpis: ReportKpis;
   categories: ReportCategoryRow[];
   transactions: ReportTxRow[];
