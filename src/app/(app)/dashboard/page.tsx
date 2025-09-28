@@ -152,81 +152,104 @@ export default function DashboardPage() {
   const showSkeletons = !filters || loading;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+    <div className="mx-auto max-w-screen-2xl px-3 sm:px-4 lg:px-0">
+      <div className="space-y-6">
+        {/* Page title scales down on mobile */}
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+          Dashboard
+        </h1>
 
-      <GlobalFilters
-        categories={cats.map((c) => ({ id: c.id, name: c.name }))}
-        onChange={setFilters}
-      />
-
-      {/* KPIs */}
-      {showSkeletons ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="mt-3 h-7 w-24" />
-          </div>
-          <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="mt-3 h-7 w-24" />
-          </div>
-          <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="mt-3 h-7 w-24" />
-          </div>
-          <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="mt-3 h-7 w-10" />
-          </div>
+        {/* Make sure filters never cause sideways scroll on mobile */}
+        <div className="overflow-x-auto">
+          <GlobalFilters
+            categories={cats.map((c) => ({ id: c.id, name: c.name }))}
+            onChange={setFilters}
+          />
         </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard title="This Range Spend" value={`$${expense.toFixed(2)}`} />
-          <KpiCard title="This Range Income" value={`$${income.toFixed(2)}`} />
-          <KpiCard title="Net" value={`$${net.toFixed(2)}`} />
-          <KpiCard title="Transactions" value={`${count}`} />
-        </div>
-      )}
 
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-medium">Income vs Expense</h2>
-            {loading && (
-              <span className="text-xs text-muted-foreground">Loading…</span>
+        {/* KPIs */}
+        {showSkeletons ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+            <div className="min-w-0 rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
+              <Skeleton className="h-4 w-24 sm:w-28" />
+              <Skeleton className="mt-3 h-6 w-20 sm:h-7 sm:w-24" />
+            </div>
+            <div className="min-w-0 rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
+              <Skeleton className="h-4 w-24 sm:w-28" />
+              <Skeleton className="mt-3 h-6 w-20 sm:h-7 sm:w-24" />
+            </div>
+            <div className="min-w-0 rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="mt-3 h-6 w-20 sm:h-7 sm:w-24" />
+            </div>
+            <div className="min-w-0 rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
+              <Skeleton className="h-4 w-20 sm:w-24" />
+              <Skeleton className="mt-3 h-6 w-10 sm:h-7 sm:w-10" />
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+  {/* min-w-0 prevents number wrapping/overflow on tiny screens */}
+  <div className="min-w-0">
+    <KpiCard title="This Range Spend" value={`$${expense.toFixed(2)}`} />
+  </div>
+  <div className="min-w-0">
+    <KpiCard title="This Range Income" value={`$${income.toFixed(2)}`} />
+  </div>
+  <div className="min-w-0">
+    <KpiCard title="Net" value={`$${net.toFixed(2)}`} />
+  </div>
+  <div className="min-w-0">
+    <KpiCard title="Transactions" value={`${count}`} />
+  </div>
+</div>
+
+        )}
+
+        {/* Charts */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-base font-medium sm:text-lg">Income vs Expense</h2>
+              {loading && (
+                <span className="text-xs text-muted-foreground">Loading…</span>
+              )}
+            </div>
+            {showSkeletons ? (
+              <Skeleton className="h-[220px] w-full rounded-xl sm:h-[260px]" />
+            ) : txs.length === 0 ? (
+              <EmptyState
+                title="No data for this range"
+                description="Try widening your date range or adding transactions."
+              />
+            ) : (
+              // Parent has stable, responsive height
+              <div className="h-[220px] w-full sm:h-[260px]">
+                <TrendChart data={trendData} />
+              </div>
             )}
           </div>
-          {showSkeletons ? (
-            <Skeleton className="h-[260px] w-full rounded-xl" />
-          ) : txs.length === 0 ? (
-            <EmptyState
-              title="No data for this range"
-              description="Try widening your date range or adding transactions."
-            />
-          ) : (
-            <TrendChart data={trendData} />
-          )}
-        </div>
 
-        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-medium">Spend by Category</h2>
-            {loading && (
-              <span className="text-xs text-muted-foreground">Loading…</span>
+          <div className="rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-base font-medium sm:text-lg">Spend by Category</h2>
+              {loading && (
+                <span className="text-xs text-muted-foreground">Loading…</span>
+              )}
+            </div>
+            {showSkeletons ? (
+              <Skeleton className="h-[220px] w-full rounded-xl sm:h-[260px]" />
+            ) : txs.length === 0 ? (
+              <EmptyState
+                title="No expenses to show"
+                description="When you add expense transactions, they’ll appear here."
+              />
+            ) : (
+              <div className="h-[220px] w-full sm:h-[260px]">
+                <CategoryPie data={categoryPieData} />
+              </div>
             )}
           </div>
-          {showSkeletons ? (
-            <Skeleton className="h-[260px] w-full rounded-xl" />
-          ) : txs.length === 0 ? (
-            <EmptyState
-              title="No expenses to show"
-              description="When you add expense transactions, they’ll appear here."
-            />
-          ) : (
-            <CategoryPie data={categoryPieData} />
-          )}
         </div>
       </div>
     </div>
