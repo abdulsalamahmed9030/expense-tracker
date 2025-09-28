@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { AppSidebarLayout } from "@/components/sidebar/app-sidebar";
+import { TopNav } from "@/components/nav/top-nav";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createSupabaseServerClient();
@@ -12,5 +14,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     redirect("/sign-in");
   }
 
-  return <>{children}</>;
+  return (
+    <AppSidebarLayout>
+      <TopNav />
+      <main className="p-6">{children}</main>
+    </AppSidebarLayout>
+  );
 }
