@@ -1,8 +1,47 @@
-export default function SettingsPage() {
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Card } from "@/components/ui/card";
+import { ProfileForm } from "@/components/settings/profile-form";
+import { PasswordForm } from "@/components/settings/password-form";
+
+export default async function SettingsPage() {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Should be protected by (app)/layout, but guard anyway
+  if (!user) {
+    return null;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
   return (
-    <div className="space-y-2">
-      <h1 className="text-2xl font-semibold">Settings</h1>
-      <p className="text-sm text-muted-foreground">Profile and preferences (later).</p>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="p-6 space-y-4">
+          <div className="text-lg font-medium">Profile</div>
+          <ProfileForm
+            email={user.email ?? ""}
+            initialData={{
+              full_name: profile?.full_name ?? "",
+              avatar_url: profile?.avatar_url ?? "",
+            }}
+          />
+        </Card>
+
+        <Card className="p-6 space-y-4">
+          <div className="text-lg font-medium">Security</div>
+          <PasswordForm />
+        </Card>
+      </div>
     </div>
   );
 }
