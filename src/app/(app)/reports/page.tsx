@@ -39,15 +39,21 @@ export default function ReportsPage() {
         .order("created_at", { ascending: false });
       if (mounted && data) setCats(data as Category[]);
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [supabase]);
 
-  // Load transactions per filters
+  // Load transactions per filters (with a fixed 2s artificial delay)
   useEffect(() => {
     if (!filters) return;
     let mounted = true;
+
     (async () => {
       setLoading(true);
+
+      // ✅ Artificial delay: always wait 2 seconds before showing results
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       let q = supabase
         .from("transactions")
@@ -68,7 +74,9 @@ export default function ReportsPage() {
       setLoading(false);
     })();
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [filters, supabase]);
 
   // KPI calculations
@@ -132,7 +140,7 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
         <Button onClick={exportPdf} disabled={!filters || loading}>
-          Export PDF
+          {loading ? "Preparing…" : "Export PDF"}
         </Button>
       </div>
 
@@ -180,7 +188,7 @@ export default function ReportsPage() {
               {categoryRows.length === 0 && (
                 <tr>
                   <td colSpan={2} className="px-4 py-6 text-center text-muted-foreground">
-                    No expenses in this range
+                    {loading ? "Loading…" : "No expenses in this range"}
                   </td>
                 </tr>
               )}
@@ -215,7 +223,7 @@ export default function ReportsPage() {
               {txRows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                    No transactions in this range
+                    {loading ? "Loading…" : "No transactions in this range"}
                   </td>
                 </tr>
               )}
@@ -227,3 +235,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+  

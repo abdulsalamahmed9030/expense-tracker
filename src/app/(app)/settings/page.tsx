@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { PasswordForm } from "@/components/settings/password-form";
+import { redirect } from "next/navigation";
 
 export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient();
@@ -10,9 +11,8 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Should be protected by (app)/layout, but guard anyway
   if (!user) {
-    return null;
+    redirect("/login"); // ✅ better UX than null
   }
 
   const { data: profile } = await supabase
@@ -32,7 +32,7 @@ export default async function SettingsPage() {
             email={user.email ?? ""}
             initialData={{
               full_name: profile?.full_name ?? "",
-              avatar_url: profile?.avatar_url ?? "",
+              avatar_url: profile?.avatar_url ?? undefined, // ✅ normalize null → undefined
             }}
           />
         </Card>

@@ -6,6 +6,8 @@ import { AddTransactionModal } from "@/components/transactions/add-transaction-m
 import { EditTransactionModal } from "@/components/transactions/edit-transaction-modal";
 import { DeleteTransactionButton } from "@/components/transactions/delete-transaction-button";
 import { CategoryPill } from "@/components/categories/category-pill";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type Transaction = {
   id: string;
@@ -28,8 +30,9 @@ export default function TransactionsPage() {
   const supabase = createSupabaseBrowserClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Build an id -> category map for quick lookup
+  // Build id -> category map
   const catMap = useMemo(() => {
     const m = new Map<string, Category>();
     for (const c of categories) m.set(c.id, c);
@@ -41,7 +44,8 @@ export default function TransactionsPage() {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const init = async () => {
-      // 1) Initial data
+      setLoading(true);
+
       const [{ data: tx }, { data: cats }] = await Promise.all([
         supabase.from("transactions").select("*").order("occurred_at", { ascending: false }),
         supabase.from("categories").select("id,name,color,icon").order("created_at", { ascending: false }),
@@ -49,15 +53,15 @@ export default function TransactionsPage() {
 
       if (isMounted && tx) setTransactions(tx as Transaction[]);
       if (isMounted && cats) setCategories(cats as Category[]);
+      setLoading(false);
 
-      // 2) Scope realtime by current user for transactions
+      // realtime for current user
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) return;
 
       channel = supabase
         .channel("transactions+categories-realtime")
-        // transactions
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "transactions", filter: `user_id=eq.${userId}` },
@@ -77,28 +81,6 @@ export default function TransactionsPage() {
           (payload) => {
             const oldRow = payload.old as { id: string };
             setTransactions((prev) => prev.filter((t) => t.id !== oldRow.id));
-          }
-        )
-        // categories (so pills update live if you edit/delete a category)
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "categories" },
-          (payload) => setCategories((prev) => [payload.new as Category, ...prev])
-        )
-        .on(
-          "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "categories" },
-          (payload) => {
-            const next = payload.new as Category;
-            setCategories((prev) => prev.map((c) => (c.id === next.id ? next : c)));
-          }
-        )
-        .on(
-          "postgres_changes",
-          { event: "DELETE", schema: "public", table: "categories" },
-          (payload) => {
-            const old = payload.old as { id: string };
-            setCategories((prev) => prev.filter((c) => c.id !== old.id));
           }
         )
         .subscribe();
@@ -131,32 +113,50 @@ export default function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {transactions.map((t) => {
-              const cat = t.category_id ? catMap.get(t.category_id) : null;
-              return (
-                <tr key={t.id} className="border-b last:border-0">
-                  <td className="px-4 py-2">{new Date(t.occurred_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-2">{t.type}</td>
-                  <td className="px-4 py-2">
-                    {cat ? (
-                      <CategoryPill name={cat.name} color={cat.color} />
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2">${Number(t.amount).toFixed(2)}</td>
-                  <td className="px-4 py-2">{t.note ?? "-"}</td>
-                  <td className="px-4 py-2 flex gap-2">
-                    <EditTransactionModal transaction={t} />
-                    <DeleteTransactionButton id={t.id} />
-                  </td>
+            {loading &&
+              [...Array(5)].map((_, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-2"><Skeleton className="h-4 w-24" /></td>
+                  <td className="px-4 py-2"><Skeleton className="h-4 w-16" /></td>
+                  <td className="px-4 py-2"><Skeleton className="h-4 w-20" /></td>
+                  <td className="px-4 py-2"><Skeleton className="h-4 w-16" /></td>
+                  <td className="px-4 py-2"><Skeleton className="h-4 w-28" /></td>
+                  <td className="px-4 py-2"><Skeleton className="h-8 w-20" /></td>
                 </tr>
-              );
-            })}
-            {transactions.length === 0 && (
+              ))}
+
+            {!loading &&
+              transactions.map((t) => {
+                const cat = t.category_id ? catMap.get(t.category_id) : null;
+                return (
+                  <tr key={t.id} className="border-b last:border-0">
+                    <td className="px-4 py-2">{new Date(t.occurred_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-2">{t.type}</td>
+                    <td className="px-4 py-2">
+                      {cat ? (
+                        <CategoryPill name={cat.name} color={cat.color} />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">${Number(t.amount).toFixed(2)}</td>
+                    <td className="px-4 py-2">{t.note ?? "-"}</td>
+                    <td className="px-4 py-2 flex gap-2">
+                      <EditTransactionModal transaction={t} />
+                      <DeleteTransactionButton id={t.id} />
+                    </td>
+                  </tr>
+                );
+              })}
+
+            {!loading && transactions.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                  No transactions yet
+                <td colSpan={6} className="px-4 py-6 text-center">
+                  <EmptyState
+                    title="No transactions yet"
+                    description="Add your first transaction to get started."
+                    action={<AddTransactionModal />}
+                  />
                 </td>
               </tr>
             )}

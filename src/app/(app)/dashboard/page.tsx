@@ -2,9 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { GlobalFilters, type FiltersState } from "@/components/filters/global-filters";
+import {
+  GlobalFilters,
+  type FiltersState,
+} from "@/components/filters/global-filters";
 import { KpiCard } from "@/components/dashboard/kpi-card";
-import { TrendChart, CategoryPie, type TrendPoint, type CategorySlice } from "@/components/dashboard/charts";
+import {
+  TrendChart,
+  CategoryPie,
+  type TrendPoint,
+  type CategorySlice,
+} from "@/components/dashboard/charts";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type Transaction = {
   id: string;
@@ -94,7 +104,10 @@ export default function DashboardPage() {
     const map = new Map<string, { income: number; expense: number }>();
     for (const t of txs) {
       const d = new Date(t.occurred_at);
-      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}`;
       if (!map.has(label)) map.set(label, { income: 0, expense: 0 });
       const entry = map.get(label)!;
       if (t.type === "income") entry.income += Number(t.amount);
@@ -136,6 +149,8 @@ export default function DashboardPage() {
     return arr.sort((a, b) => b.value - a.value);
   }, [txs, catMap]);
 
+  const showSkeletons = !filters || loading;
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
@@ -146,12 +161,33 @@ export default function DashboardPage() {
       />
 
       {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="This Range Spend" value={`$${expense.toFixed(2)}`} />
-        <KpiCard title="This Range Income" value={`$${income.toFixed(2)}`} />
-        <KpiCard title="Net" value={`$${net.toFixed(2)}`} />
-        <KpiCard title="Transactions" value={`${count}`} />
-      </div>
+      {showSkeletons ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="mt-3 h-7 w-24" />
+          </div>
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="mt-3 h-7 w-24" />
+          </div>
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="mt-3 h-7 w-24" />
+          </div>
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="mt-3 h-7 w-10" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard title="This Range Spend" value={`$${expense.toFixed(2)}`} />
+          <KpiCard title="This Range Income" value={`$${income.toFixed(2)}`} />
+          <KpiCard title="Net" value={`$${net.toFixed(2)}`} />
+          <KpiCard title="Transactions" value={`${count}`} />
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -162,8 +198,18 @@ export default function DashboardPage() {
               <span className="text-xs text-muted-foreground">Loading…</span>
             )}
           </div>
-          <TrendChart data={trendData} />
+          {showSkeletons ? (
+            <Skeleton className="h-[260px] w-full rounded-xl" />
+          ) : txs.length === 0 ? (
+            <EmptyState
+              title="No data for this range"
+              description="Try widening your date range or adding transactions."
+            />
+          ) : (
+            <TrendChart data={trendData} />
+          )}
         </div>
+
         <div className="rounded-2xl border bg-card p-4 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-lg font-medium">Spend by Category</h2>
@@ -171,7 +217,16 @@ export default function DashboardPage() {
               <span className="text-xs text-muted-foreground">Loading…</span>
             )}
           </div>
-          <CategoryPie data={categoryPieData} />
+          {showSkeletons ? (
+            <Skeleton className="h-[260px] w-full rounded-xl" />
+          ) : txs.length === 0 ? (
+            <EmptyState
+              title="No expenses to show"
+              description="When you add expense transactions, they’ll appear here."
+            />
+          ) : (
+            <CategoryPie data={categoryPieData} />
+          )}
         </div>
       </div>
     </div>
