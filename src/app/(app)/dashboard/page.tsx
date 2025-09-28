@@ -32,6 +32,13 @@ type Category = {
   color: string | null;
 };
 
+// 🔢 INR formatter (Indian digit grouping)
+const formatINR = (n: number) =>
+  Number(n || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 export default function DashboardPage() {
   const supabase = createSupabaseBrowserClient();
 
@@ -169,7 +176,7 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         {showSkeletons ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-4">
             <div className="min-w-0 rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
               <Skeleton className="h-4 w-24 sm:w-28" />
               <Skeleton className="mt-3 h-6 w-20 sm:h-7 sm:w-24" />
@@ -188,26 +195,25 @@ export default function DashboardPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
-  {/* min-w-0 prevents number wrapping/overflow on tiny screens */}
-  <div className="min-w-0">
-    <KpiCard title="This Range Spend" value={`$${expense.toFixed(2)}`} />
-  </div>
-  <div className="min-w-0">
-    <KpiCard title="This Range Income" value={`$${income.toFixed(2)}`} />
-  </div>
-  <div className="min-w-0">
-    <KpiCard title="Net" value={`$${net.toFixed(2)}`} />
-  </div>
-  <div className="min-w-0">
-    <KpiCard title="Transactions" value={`${count}`} />
-  </div>
-</div>
-
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+            {/* min-w-0 prevents number wrapping/overflow on tiny screens */}
+            <div className="min-w-0">
+              <KpiCard title="This Range Spend" value={`₹ ${formatINR(expense)}`} />
+            </div>
+            <div className="min-w-0">
+              <KpiCard title="This Range Income" value={`₹ ${formatINR(income)}`} />
+            </div>
+            <div className="min-w-0">
+              <KpiCard title="Net" value={`₹ ${formatINR(net)}`} />
+            </div>
+            <div className="min-w-0">
+              <KpiCard title="Transactions" value={`${count}`} />
+            </div>
+          </div>
         )}
 
         {/* Charts */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-base font-medium sm:text-lg">Income vs Expense</h2>

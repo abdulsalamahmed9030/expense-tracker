@@ -23,6 +23,13 @@ type Category = {
   color: string | null;
 };
 
+// 🔢 INR formatter (Indian digit grouping)
+const formatINR = (n: number) =>
+  Number(n || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 export default function BudgetsPage() {
   const supabase = createSupabaseBrowserClient();
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -102,8 +109,8 @@ export default function BudgetsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header: stack on mobile, row on sm+ */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {loading ? (
           <>
             <Skeleton className="h-7 w-40" />
@@ -112,16 +119,18 @@ export default function BudgetsPage() {
         ) : (
           <>
             <h1 className="text-2xl font-semibold tracking-tight">Budgets</h1>
-            <AddBudgetModal />
+            <div className="w-full sm:w-auto">
+              <AddBudgetModal />
+            </div>
           </>
         )}
       </div>
 
-      {/* Loading skeleton grid */}
+      {/* Loading skeleton grid: 1 → 2 (md) → 3 (lg) */}
       {loading && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="p-4 space-y-3">
+            <Card key={i} className="space-y-3 p-4">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-5 w-40" />
                 <Skeleton className="h-4 w-12" />
@@ -143,14 +152,18 @@ export default function BudgetsPage() {
           <EmptyState
             title="No budgets yet"
             description="Create a monthly budget to track your spending."
-            action={<AddBudgetModal />}
+            action={
+              <div className="w-full sm:w-auto">
+                <AddBudgetModal />
+              </div>
+            }
           />
         </Card>
       )}
 
-      {/* Budgets grid */}
+      {/* Budgets grid: 1 → 2 (md) → 3 (lg) */}
       {!loading && budgets.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {budgets.map((b) => {
             const cat = categories.find((c) => c.id === b.category_id);
             const spent = spending[b.category_id] ?? 0;
@@ -161,9 +174,9 @@ export default function BudgetsPage() {
             else if (pct > 80) barColor = "bg-amber-500";
 
             return (
-              <Card key={b.id} className="p-4 space-y-2">
+              <Card key={b.id} className="space-y-2 p-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium flex items-center gap-2">
+                  <span className="flex items-center gap-2 font-medium">
                     {cat ? (
                       <>
                         <span
@@ -182,11 +195,14 @@ export default function BudgetsPage() {
                   </span>
                 </div>
 
-                <div className="text-sm">
-                  Budget: ${b.amount.toFixed(2)} | Spent: ${spent.toFixed(2)}
+                <div className="text-sm tabular-nums">
+                  Budget: ₹ {formatINR(b.amount)} | Spent: ₹ {formatINR(spent)}
                 </div>
 
-                <div className="h-2 w-full rounded bg-muted" aria-label="Budget progress bar">
+                <div
+                  className="h-2 w-full rounded bg-muted"
+                  aria-label="Budget progress bar"
+                >
                   <div
                     className={`h-2 rounded ${barColor}`}
                     style={{ width: `${pct}%` }}
@@ -194,9 +210,9 @@ export default function BudgetsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <EditBudgetModal budget={b} />
-                  <DeleteBudgetButton id={b.id!} />
+                  <DeleteBudgetButton id={b.id} />
                 </div>
               </Card>
             );

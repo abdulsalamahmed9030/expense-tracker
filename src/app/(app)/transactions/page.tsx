@@ -26,6 +26,13 @@ type Category = {
   icon: string | null;
 };
 
+// 🔢 INR formatter (Indian grouping)
+const formatINR = (n: number) =>
+  Number(n || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 export default function TransactionsPage() {
   const supabase = createSupabaseBrowserClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -98,10 +105,13 @@ export default function TransactionsPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Transactions</h1>
 
-      <AddTransactionModal />
+      <div className="w-full sm:w-auto">
+        <AddTransactionModal />
+      </div>
 
-      <div className="rounded-2xl border bg-card shadow-sm">
-        <table className="w-full text-sm">
+      {/* Make table safe on phones: overflow-x-auto + no-wrap fixes */}
+      <div className="rounded-2xl border bg-card shadow-sm overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="border-b bg-muted/30">
             <tr>
               <th className="px-4 py-2 text-left">Date</th>
@@ -130,8 +140,10 @@ export default function TransactionsPage() {
                 const cat = t.category_id ? catMap.get(t.category_id) : null;
                 return (
                   <tr key={t.id} className="border-b last:border-0">
-                    <td className="px-4 py-2">{new Date(t.occurred_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-2">{t.type}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {new Date(t.occurred_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-2 capitalize">{t.type}</td>
                     <td className="px-4 py-2">
                       {cat ? (
                         <CategoryPill name={cat.name} color={cat.color} />
@@ -139,11 +151,17 @@ export default function TransactionsPage() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-2">${Number(t.amount).toFixed(2)}</td>
-                    <td className="px-4 py-2">{t.note ?? "-"}</td>
-                    <td className="px-4 py-2 flex gap-2">
-                      <EditTransactionModal transaction={t} />
-                      <DeleteTransactionButton id={t.id} />
+                    <td className="px-4 py-2 tabular-nums whitespace-nowrap">
+                      ₹ {formatINR(Number(t.amount))}
+                    </td>
+                    <td className="px-4 py-2 max-w-[280px] truncate md:max-w-none">
+                      {t.note ?? "-"}
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-wrap gap-2">
+                        <EditTransactionModal transaction={t} />
+                        <DeleteTransactionButton id={t.id} />
+                      </div>
                     </td>
                   </tr>
                 );

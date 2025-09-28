@@ -22,6 +22,10 @@ type Category = {
   color: string | null;
 };
 
+// 🔢 One helper to format all INR amounts consistently (Indian digit grouping)
+const formatINR = (n: number) =>
+  Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export default function ReportsPage() {
   const supabase = createSupabaseBrowserClient();
   const [filters, setFilters] = useState<FiltersState | null>(null);
@@ -86,13 +90,14 @@ export default function ReportsPage() {
     return { income, expense, net: income - expense, count: txs.length };
   }, [txs]);
 
-  // Category breakdown (expenses)
+  // Category lookup
   const catMap = useMemo(() => {
     const m = new Map<string, Category>();
     for (const c of cats) m.set(c.id, c);
     return m;
   }, [cats]);
 
+  // Category breakdown (expenses)
   const categoryRows: ReportCategoryRow[] = useMemo(() => {
     const sums = new Map<string, number>();
     for (const t of txs) {
@@ -112,7 +117,7 @@ export default function ReportsPage() {
     return rows.sort((a, b) => b.amount - a.amount);
   }, [txs, catMap]);
 
-  // Tx rows for PDF
+  // Tx rows for PDF (keep numbers raw; we format only when rendering)
   const txRows: ReportTxRow[] = useMemo(() => {
     return txs.map((t) => ({
       date: new Date(t.occurred_at).toLocaleDateString(),
@@ -129,7 +134,7 @@ export default function ReportsPage() {
       title: "Expense Tracker Report",
       from: filters.from,
       to: filters.to,
-      kpis: { income, expense, net, count },
+      kpis: { income, expense, net, count }, // keep numerics for the generator
       categories: categoryRows,
       transactions: txRows
     });
@@ -149,18 +154,19 @@ export default function ReportsPage() {
         onChange={setFilters}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPIs */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Income</div>
-          <div className="mt-2 text-2xl font-semibold">${income.toFixed(2)}</div>
+          <div className="mt-2 text-2xl font-semibold">₹ {formatINR(income)}</div>
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Expense</div>
-          <div className="mt-2 text-2xl font-semibold">${expense.toFixed(2)}</div>
+          <div className="mt-2 text-2xl font-semibold">₹ {formatINR(expense)}</div>
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Net</div>
-          <div className="mt-2 text-2xl font-semibold">${net.toFixed(2)}</div>
+          <div className="mt-2 text-2xl font-semibold">₹ {formatINR(net)}</div>
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Transactions</div>
@@ -168,6 +174,7 @@ export default function ReportsPage() {
         </Card>
       </div>
 
+      {/* Category Breakdown */}
       <div className="rounded-2xl border bg-card p-4 shadow-sm">
         <div className="mb-2 text-lg font-medium">Category Breakdown (Expenses)</div>
         <div className="overflow-x-auto">
@@ -182,7 +189,7 @@ export default function ReportsPage() {
               {categoryRows.map((r, idx) => (
                 <tr key={`${r.name}-${idx}`} className="border-b last:border-0">
                   <td className="px-4 py-2">{r.name}</td>
-                  <td className="px-4 py-2">${r.amount.toFixed(2)}</td>
+                  <td className="px-4 py-2">₹ {formatINR(r.amount)}</td>
                 </tr>
               ))}
               {categoryRows.length === 0 && (
@@ -197,6 +204,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      {/* Transactions */}
       <div className="rounded-2xl border bg-card p-4 shadow-sm">
         <div className="mb-2 text-lg font-medium">Transactions</div>
         <div className="overflow-x-auto">
@@ -216,7 +224,7 @@ export default function ReportsPage() {
                   <td className="px-4 py-2">{t.date}</td>
                   <td className="px-4 py-2">{t.type}</td>
                   <td className="px-4 py-2">{t.category}</td>
-                  <td className="px-4 py-2">${t.amount.toFixed(2)}</td>
+                  <td className="px-4 py-2">₹ {formatINR(t.amount)}</td>
                   <td className="px-4 py-2">{t.note || "-"}</td>
                 </tr>
               ))}
@@ -235,4 +243,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-  
