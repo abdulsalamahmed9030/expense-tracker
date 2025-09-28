@@ -110,6 +110,7 @@ export default function TransactionsPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Transactions</h1>
 
+      {/* Make trigger full-width on mobile for better ergonomics */}
       <div className="w-full sm:w-auto">
         <AddTransactionModal />
       </div>
@@ -151,11 +152,7 @@ export default function TransactionsPage() {
                   </div>
                 </div>
 
-                {t.note && (
-                  <div className="mt-2 text-sm leading-relaxed break-words">
-                    {t.note}
-                  </div>
-                )}
+                {t.note && <div className="mt-2 text-sm leading-relaxed break-words">{t.note}</div>}
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <EditTransactionModal transaction={t} />

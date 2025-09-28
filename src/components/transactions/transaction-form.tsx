@@ -13,7 +13,7 @@ import { createTransaction, updateTransaction } from "@/app/(app)/transactions/a
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Category = {
-  id: string;        // UUID in DB; if your transactions.category_id is TEXT, this will still be fine
+  id: string;
   name: string;
   color: string;
   icon: string | null;
@@ -33,7 +33,6 @@ export function TransactionForm({
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-    
     watch,
   } = useForm<TransactionInput>({
     resolver: zodResolver(transactionSchema),
@@ -83,7 +82,6 @@ export function TransactionForm({
       } else {
         await createTransaction({
           ...values,
-          // category is optional → send null if empty
           category_id: values.category_id ? values.category_id : null,
         });
       }
@@ -108,7 +106,7 @@ export function TransactionForm({
 
       <div>
         <label className="text-sm font-medium">Amount</label>
-        <Input type="number" step="0.01" {...register("amount", { valueAsNumber: true })} />
+        <Input type="number" step="0.01" inputMode="decimal" {...register("amount", { valueAsNumber: true })} />
         {errors.amount && <p className="text-sm text-red-500">{errors.amount.message}</p>}
       </div>
 
@@ -124,7 +122,6 @@ export function TransactionForm({
       <div>
         <label className="text-sm font-medium">Category (optional)</label>
 
-        {/* Category Select populated from Supabase */}
         <select
           {...register("category_id")}
           className="w-full rounded-xl border px-3 py-2"
@@ -139,7 +136,6 @@ export function TransactionForm({
             ))}
         </select>
 
-        {/* Tiny visual chip preview when a category is selected */}
         {selectedCategory && (
           <div className="mt-2 inline-flex items-center gap-2 rounded-xl border px-2 py-1 text-xs">
             <span
