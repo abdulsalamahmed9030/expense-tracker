@@ -55,19 +55,33 @@ export function CategoryForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
         <label className="text-sm font-medium">Name</label>
-        <Input {...register("name")} />
+        <Input {...register("name")} autoComplete="off" />
         {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
       </div>
 
       <div>
         <label className="text-sm font-medium">Color</label>
-        <Input type="color" {...register("color")} />
+        <div className="flex items-center gap-3">
+          <Input type="color" {...register("color")} className="h-10 w-16 p-1" />
+          {/* Optional hex text for manual edits (mobile-friendly) */}
+          <Input
+            {...register("color")}
+            placeholder="#000000"
+            inputMode="text"
+            className="flex-1"
+          />
+        </div>
         {errors.color && <p className="text-sm text-red-500">{errors.color.message}</p>}
       </div>
 
       <div>
         <label className="text-sm font-medium">Icon (optional)</label>
-        <Input {...register("icon")} placeholder="e.g. shopping-cart" />
+        <Input
+          {...register("icon")}
+          placeholder="e.g. shopping-cart"
+          autoComplete="off"
+          inputMode="text"
+        />
       </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
