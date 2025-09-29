@@ -1,8 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { categorySchema } from "@/lib/validation/category";
+
+const LIST_PATH = "/categories";
+const CATEGORIES_TAG = "categories";
 
 export async function createCategory(data: unknown) {
   const supabase = await createSupabaseServerClient();
@@ -10,12 +13,18 @@ export async function createCategory(data: unknown) {
   const parsed = categorySchema.omit({ id: true }).safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const { error } = await supabase.from("categories").insert({
-    ...parsed.data,
-  });
+  const { data: row, error } = await supabase
+    .from("categories")
+    .insert(parsed.data)
+    .select("*")
+    .single();
 
   if (error) throw error;
-  revalidatePath("/categories");
+
+  revalidatePath(LIST_PATH);
+  revalidateTag(CATEGORIES_TAG);
+
+  return { ok: true, data: row };
 }
 
 export async function updateCategory(data: unknown) {
@@ -26,14 +35,29 @@ export async function updateCategory(data: unknown) {
 
   const { id, ...rest } = parsed.data;
 
-  const { error } = await supabase.from("categories").update(rest).eq("id", id!);
+  const { data: row, error } = await supabase
+    .from("categories")
+    .update(rest)
+    .eq("id", id!)
+    .select("*")
+    .single();
+
   if (error) throw error;
-  revalidatePath("/categories");
+
+  revalidatePath(LIST_PATH);
+  revalidateTag(CATEGORIES_TAG);
+
+  return { ok: true, data: row };
 }
 
 export async function deleteCategory(id: string) {
   const supabase = await createSupabaseServerClient();
+
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) throw error;
-  revalidatePath("/categories");
+
+  revalidatePath(LIST_PATH);
+  revalidateTag(CATEGORIES_TAG);
+
+  return { ok: true, id };
 }

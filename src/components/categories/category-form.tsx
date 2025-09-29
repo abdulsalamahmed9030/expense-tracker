@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { createCategory, updateCategory } from "@/app/(app)/categories/actions";
+import { useRouter } from "next/navigation";
 
 export function CategoryForm({
   onSuccess,
@@ -15,6 +16,8 @@ export function CategoryForm({
   onSuccess?: () => void;
   initialData?: CategoryInput;
 }) {
+  const router = useRouter();
+
   const {
     register,
     handleSubmit,
@@ -33,7 +36,6 @@ export function CategoryForm({
     if (initialData) reset(initialData);
   }, [initialData, reset]);
 
-  // Single source of truth for the color
   const color = watch("color");
 
   const onSubmit = async (values: CategoryInput) => {
@@ -45,7 +47,10 @@ export function CategoryForm({
         await createCategory(values);
       }
       reset();
-      onSuccess?.();
+      onSuccess?.();         // close sheet/modal
+      router.refresh();      // refresh server components (if any are on the route)
+      // 🔔 Tell any client list to refetch immediately:
+      window.dispatchEvent(new Event("categories:refetch"));
     } catch (e: unknown) {
       const message =
         e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
@@ -64,12 +69,11 @@ export function CategoryForm({
       <div>
         <label className="text-sm font-medium">Color</label>
         <div className="flex items-center gap-3">
-          {/* The color picker is the ONLY registered input for "color" */}
+          {/* Only this input is registered to "color" */}
           <Input
             type="color"
             className="h-10 w-16 p-1"
             {...register("color")}
-            // Optional: ensure RHF marks as dirty/validating on manual set
             onChange={(e) =>
               setValue("color", e.target.value, {
                 shouldDirty: true,
@@ -79,18 +83,19 @@ export function CategoryForm({
             value={color}
           />
 
-          {/* Mirror field: NOT registered. It just mirrors and updates via setValue */}
+          {/* Mirror hex text field (unregistered) */}
           <Input
             placeholder="#000000"
             inputMode="text"
             className="flex-1"
             value={color}
-            onChange={(e) => {
-              const v = e.target.value;
-              setValue("color", v, { shouldDirty: true, shouldValidate: true });
-            }}
+            onChange={(e) =>
+              setValue("color", e.target.value, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
             onBlur={(e) => {
-              // Optional: normalize uppercase and trim
               const v = e.target.value.trim();
               setValue("color", v.toUpperCase(), { shouldValidate: true });
             }}
