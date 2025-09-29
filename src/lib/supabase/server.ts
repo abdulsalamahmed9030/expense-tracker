@@ -18,10 +18,10 @@ export async function createSupabaseServerClientReadOnly() {
           return cookieStore.get(name)?.value;
         },
         // No-ops in Server Components to avoid "Cookies can only be modified..." error
-        set() {
+        set(_: string, __: string, ___: CookieOptions) {
           /* no-op in RSC */
         },
-        remove() {
+        remove(_: string, __: CookieOptions) {
           /* no-op in RSC */
         },
       },

@@ -37,7 +37,11 @@ export function AddCategoryModal() {
 
       <SheetContent
         side={isMobile ? "bottom" : "right"}
-        className={isMobile ? "w-full max-w-full p-4 pb-6" : "w-[480px] p-6"}
+        className={
+          isMobile
+            ? "w-full max-w-full p-4 pb-6"
+            : "w-[480px] p-6"
+        }
       >
         <SheetHeader>
           <SheetTitle>Add Category</SheetTitle>
@@ -45,7 +49,6 @@ export function AddCategoryModal() {
 
         {/* Scrollable area to avoid keyboard cut-off */}
         <div className="mt-4 overflow-y-auto max-h-[70vh]">
-          {/* CategoryForm calls router.refresh() onSuccess */}
           <CategoryForm onSuccess={() => setOpen(false)} />
         </div>
       </SheetContent>

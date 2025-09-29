@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { AddCategoryModal } from "@/components/categories/add-category-modal";
 import { EditCategoryModal } from "@/components/categories/edit-category-modal";
@@ -13,92 +13,65 @@ type Category = {
   name: string;
   color: string;
   icon: string | null;
-  created_at?: string | null;
 };
 
 export default function CategoriesPage() {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const supabase = createSupabaseBrowserClient();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  const refreshCategories = async () => {
-    if (mountedRef.current) setLoading(true);
-    const { data, error } = await supabase
-      .from("categories")
-      .select("*")
-      .order("created_at", { ascending: false }); // adjust if no created_at
-
-    if (!error && data && mountedRef.current) {
-      setCategories(data as Category[]);
-    }
-    if (mountedRef.current) setLoading(false);
-  };
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    (async () => {
-      // Initial load
-      await refreshCategories();
+    const init = async () => {
+      setLoading(true);
 
-      // Realtime for INSERT/UPDATE/DELETE
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) setCategories(data as Category[]);
+      setLoading(false);
+
       channel = supabase
         .channel("categories-realtime")
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "categories" },
+          { event: "INSERT", schema: "public", table: "categories" },
           (payload) => {
-            if (payload.eventType === "INSERT") {
-              const next = payload.new as Category;
-              setCategories((prev) => {
-                if (prev.find((c) => c.id === next.id)) return prev;
-                return [next, ...prev];
-              });
-            } else if (payload.eventType === "UPDATE") {
-              const next = payload.new as Category;
-              setCategories((prev) => prev.map((c) => (c.id === next.id ? next : c)));
-            } else if (payload.eventType === "DELETE") {
-              const old = payload.old as { id: string };
-              setCategories((prev) => prev.filter((c) => c.id !== old.id));
-            }
+            setCategories((prev) => [payload.new as Category, ...prev]);
           }
         )
-        .subscribe(() => {
-          // no-op: we don't need the status; avoids unused var warnings
-        });
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "categories" },
+          (payload) => {
+            const next = payload.new as Category;
+            setCategories((prev) => prev.map((c) => (c.id === next.id ? next : c)));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "categories" },
+          (payload) => {
+            const old = payload.old as { id: string };
+            setCategories((prev) => prev.filter((c) => c.id !== old.id));
+          }
+        )
+        .subscribe();
+    };
 
-      // 🔔 Refetch immediately when a local action fires (optimistic + safety)
-      const onRefetch = () => refreshCategories();
-      window.addEventListener("categories:refetch", onRefetch);
+    init();
 
-      // Also refetch on focus/visibility regain (safety net)
-      const onFocus = () => refreshCategories();
-      const onVisible = () => {
-        if (document.visibilityState === "visible") refreshCategories();
-      };
-      window.addEventListener("focus", onFocus);
-      document.addEventListener("visibilitychange", onVisible);
-
-      // Cleanup
-      return () => {
-        window.removeEventListener("categories:refetch", onRefetch);
-        window.removeEventListener("focus", onFocus);
-        document.removeEventListener("visibilitychange", onVisible);
-        if (channel) supabase.removeChannel(channel);
-      };
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // supabase is memoized
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [supabase]);
 
   return (
     <div className="space-y-4">
+      {/* Header: stack on mobile, row on sm+ */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {loading ? (
           <>
@@ -115,6 +88,7 @@ export default function CategoriesPage() {
         )}
       </div>
 
+      {/* Loading grid: 1 (mobile) → 2 (md) → 3 (lg) */}
       {loading && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 9 }).map((_, i) => (
@@ -135,6 +109,7 @@ export default function CategoriesPage() {
         </div>
       )}
 
+      {/* Empty state */}
       {!loading && categories.length === 0 && (
         <div className="rounded-xl border p-6 shadow-sm">
           <EmptyState
@@ -149,6 +124,7 @@ export default function CategoriesPage() {
         </div>
       )}
 
+      {/* Categories grid: 1 (mobile) → 2 (md) → 3 (lg) */}
       {!loading && categories.length > 0 && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {categories.map((c) => (
