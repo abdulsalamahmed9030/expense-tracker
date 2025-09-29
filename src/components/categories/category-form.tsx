@@ -2,10 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  categorySchema,
-  type CategoryInput,
-} from "@/lib/validation/category";
+import { categorySchema, type CategoryInput } from "@/lib/validation/category";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -23,6 +20,8 @@ export function CategoryForm({
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
+    watch,
+    setValue,
   } = useForm<CategoryInput>({
     resolver: zodResolver(categorySchema),
     defaultValues: initialData ?? { name: "", color: "#000000", icon: "" },
@@ -33,6 +32,9 @@ export function CategoryForm({
   useEffect(() => {
     if (initialData) reset(initialData);
   }, [initialData, reset]);
+
+  // Single source of truth for the color
+  const color = watch("color");
 
   const onSubmit = async (values: CategoryInput) => {
     setError(null);
@@ -62,13 +64,36 @@ export function CategoryForm({
       <div>
         <label className="text-sm font-medium">Color</label>
         <div className="flex items-center gap-3">
-          <Input type="color" {...register("color")} className="h-10 w-16 p-1" />
-          {/* Optional hex text for manual edits (mobile-friendly) */}
+          {/* The color picker is the ONLY registered input for "color" */}
           <Input
+            type="color"
+            className="h-10 w-16 p-1"
             {...register("color")}
+            // Optional: ensure RHF marks as dirty/validating on manual set
+            onChange={(e) =>
+              setValue("color", e.target.value, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+            value={color}
+          />
+
+          {/* Mirror field: NOT registered. It just mirrors and updates via setValue */}
+          <Input
             placeholder="#000000"
             inputMode="text"
             className="flex-1"
+            value={color}
+            onChange={(e) => {
+              const v = e.target.value;
+              setValue("color", v, { shouldDirty: true, shouldValidate: true });
+            }}
+            onBlur={(e) => {
+              // Optional: normalize uppercase and trim
+              const v = e.target.value.trim();
+              setValue("color", v.toUpperCase(), { shouldValidate: true });
+            }}
           />
         </div>
         {errors.color && <p className="text-sm text-red-500">{errors.color.message}</p>}
