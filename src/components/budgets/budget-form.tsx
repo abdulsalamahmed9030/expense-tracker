@@ -9,6 +9,8 @@ import { createBudget, updateBudget } from "@/app/(app)/budgets/actions";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type Category = { id: string; name: string; color: string | null };
 
@@ -22,7 +24,7 @@ const budgetFormSchema = budgetSchema
   });
 
 type FormOutput = z.infer<typeof budgetFormSchema>; // after resolver (numbers)
-type FormInput  = z.input<typeof budgetFormSchema>; // before resolver (strings | numbers)
+type FormInput = z.input<typeof budgetFormSchema>; // before resolver (strings | numbers)
 
 const thisMonth = new Date();
 
@@ -34,8 +36,8 @@ export function BudgetForm({
   initialData?: Partial<FormOutput>;
 }) {
   const supabase = createSupabaseBrowserClient();
+  const router = useRouter();
 
-  // NOTE: 3 generics: <TFieldValues, TContext, TTransformedValues>
   const {
     register,
     handleSubmit,
@@ -60,10 +62,15 @@ export function BudgetForm({
     let mounted = true;
     (async () => {
       setLoadingCats(true);
-      const { data } = await supabase
+      const { data, error: qErr } = await supabase
         .from("categories")
         .select("id,name,color")
         .order("created_at", { ascending: false });
+
+      if (qErr) {
+        // Don’t block the form; just surface a toast
+        toast.error("Failed to load categories", { description: qErr.message });
+      }
       if (mounted && data) setCategories(data as Category[]);
       setLoadingCats(false);
     })();
@@ -88,19 +95,28 @@ export function BudgetForm({
   const onSubmit: SubmitHandler<FormOutput> = async (values) => {
     setError(null);
     try {
-      // Persist with your original schema (drops id if not in it)
-      const parsed = budgetSchema.parse(values);
+      const parsed = budgetSchema.parse(values); // persist with original schema (drops id)
       if (values.id) {
         await updateBudget(parsed);
+        toast.success("Budget updated", {
+          description: "Your changes were saved successfully.",
+        });
       } else {
         await createBudget(parsed);
+        toast.success("Budget created", {
+          description: "Budget added successfully.",
+        });
       }
+
       reset();
-      onSuccess?.();
+      onSuccess?.();                 // close sheet/modal if provided
+      router.refresh();              // refresh server components
+      window.dispatchEvent(new Event("budgets:refetch")); // refresh client lists
     } catch (e) {
       const message =
         e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
       setError(message);
+      toast.error("Failed to save budget", { description: String(message) });
     }
   };
 
@@ -123,7 +139,9 @@ export function BudgetForm({
           <option value="">{loadingCats ? "Loading..." : "Select category"}</option>
           {!loadingCats &&
             categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
         </select>
         {errors.category_id?.message && (
@@ -136,7 +154,9 @@ export function BudgetForm({
           <label className="text-sm font-medium">Month</label>
           <select {...register("month")} className="w-full rounded-xl border px-3 py-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>{m}</option>
+              <option key={m} value={m}>
+                {m}
+              </option>
             ))}
           </select>
           {errors.month?.message && (
@@ -148,7 +168,9 @@ export function BudgetForm({
           <label className="text-sm font-medium">Year</label>
           <select {...register("year")} className="w-full rounded-xl border px-3 py-2">
             {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
+              <option key={y} value={y}>
+                {y}
+              </option>
             ))}
           </select>
           {errors.year?.message && (

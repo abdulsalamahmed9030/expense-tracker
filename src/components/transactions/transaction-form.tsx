@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createTransaction, updateTransaction } from "@/app/(app)/transactions/actions";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type Category = {
   id: string;
@@ -24,9 +26,10 @@ export function TransactionForm({
   initialData,
 }: {
   onSuccess?: () => void;
-  initialData?: TransactionInput; // if provided → edit mode
+  initialData?: TransactionInput; // edit mode if provided
 }) {
-  const supabase = createSupabaseBrowserClient();
+  const router = useRouter();
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const {
     register,
@@ -39,7 +42,7 @@ export function TransactionForm({
     defaultValues: initialData ?? {
       type: "expense",
       occurred_at: new Date().toISOString().split("T")[0], // yyyy-mm-dd
-      category_id: "", // empty = optional
+      category_id: "",
       note: "",
     },
   });
@@ -69,9 +72,7 @@ export function TransactionForm({
 
   // When editing, reset form with initial data
   useEffect(() => {
-    if (initialData) {
-      reset(initialData);
-    }
+    if (initialData) reset(initialData);
   }, [initialData, reset]);
 
   const onSubmit = async (values: TransactionInput) => {
@@ -79,18 +80,27 @@ export function TransactionForm({
     try {
       if (initialData?.id) {
         await updateTransaction(values);
+        toast.success("Transaction updated", {
+          description: "Your changes have been saved.",
+        });
       } else {
         await createTransaction({
           ...values,
           category_id: values.category_id ? values.category_id : null,
         });
+        toast.success("Transaction added", {
+          description: "The transaction has been created.",
+        });
       }
       reset();
-      onSuccess?.();
+      onSuccess?.();                 // close modal/sheet if provided
+      router.refresh();              // refresh server components on the route
+      window.dispatchEvent(new Event("transactions:refetch")); // notify client lists
     } catch (e: unknown) {
       const message =
         e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
       setError(message);
+      toast.error("Failed to save", { description: String(message) });
     }
   };
 
@@ -106,7 +116,12 @@ export function TransactionForm({
 
       <div>
         <label className="text-sm font-medium">Amount</label>
-        <Input type="number" step="0.01" inputMode="decimal" {...register("amount", { valueAsNumber: true })} />
+        <Input
+          type="number"
+          step="0.01"
+          inputMode="decimal"
+          {...register("amount", { valueAsNumber: true })}
+        />
         {errors.amount && <p className="text-sm text-red-500">{errors.amount.message}</p>}
       </div>
 
@@ -121,7 +136,6 @@ export function TransactionForm({
 
       <div>
         <label className="text-sm font-medium">Category (optional)</label>
-
         <select
           {...register("category_id")}
           className="w-full rounded-xl border px-3 py-2"
