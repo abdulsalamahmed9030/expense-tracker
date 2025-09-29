@@ -105,7 +105,7 @@ export function CategoryForm({
       </div>
 
       <div>
-        <label className="text-sm font-medium">Icon (optional)</label>
+        <label className="text-sm font-medium">Icon (optionalf)</label>
         <Input
           {...register("icon")}
           placeholder="e.g. shopping-cart"
@@ -122,3 +122,4 @@ export function CategoryForm({
     </form>
   );
 }
+  
