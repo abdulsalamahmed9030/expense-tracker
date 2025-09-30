@@ -95,14 +95,16 @@ export function BudgetForm({
   const onSubmit: SubmitHandler<FormOutput> = async (values) => {
     setError(null);
     try {
-      const parsed = budgetSchema.parse(values); // persist with original schema (drops id)
       if (values.id) {
-        await updateBudget(parsed);
+        // UPDATE: send full object (includes id) to match server action expectations
+        await updateBudget(values);
         toast.success("Budget updated", {
           description: "Your changes were saved successfully.",
         });
       } else {
-        await createBudget(parsed);
+        // CREATE: validate against the base schema (which omits id)
+        const payload = budgetSchema.parse(values);
+        await createBudget(payload);
         toast.success("Budget created", {
           description: "Budget added successfully.",
         });
@@ -115,7 +117,7 @@ export function BudgetForm({
     } catch (e) {
       const message =
         e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
-      setError(message);
+      setError(String(message));
       toast.error("Failed to save budget", { description: String(message) });
     }
   };
@@ -194,5 +196,4 @@ export function BudgetForm({
       </Button>
     </form>
   );
-}  
-  
+}

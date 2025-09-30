@@ -8,15 +8,14 @@ import { DeleteBudgetButton } from "@/components/budgets/delete-budget-button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-
 // NEW: AI Coach
 import AICoach from "@/components/budgets/ai-coach";
 
 type Budget = {
   id: string;
   category_id: string;
-  month: number;
-  year: number;
+  month: number; // 1..12
+  year: number;  // YYYY
   amount: number;
 };
 
@@ -33,56 +32,105 @@ const formatINR = (n: number) =>
     maximumFractionDigits: 2,
   });
 
+// Spending map key = `${year}-${month}-${category_id||"__uncategorized__"}`
+type SpendingMap = Record<string, number>;
+
 export default function BudgetsPage() {
   const supabase = createSupabaseBrowserClient();
+
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [spending, setSpending] = useState<Record<string, number>>({});
+  const [spending, setSpending] = useState<SpendingMap>({});
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
 
     // 1) Categories
-    const { data: catData } = await supabase
+    const { data: catData, error: catErr } = await supabase
       .from("categories")
       .select("id,name,color");
-    if (catData) setCategories(catData as Category[]);
+    if (!catErr && catData) setCategories(catData as Category[]);
 
     // 2) Budgets
-    const { data: budData } = await supabase.from("budgets").select("*");
-    if (budData) setBudgets(budData as Budget[]);
+    const { data: budData, error: budErr } = await supabase
+      .from("budgets")
+      .select("*");
+    if (budErr) {
+      setBudgets([]);
+      setSpending({});
+      setLoading(false);
+      return;
+    }
+    const allBudgets = (budData ?? []) as Budget[];
+    setBudgets(allBudgets);
 
-    // 3) Current month expenses
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .split("T")[0];
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      .toISOString()
-      .split("T")[0];
-
-    const { data: txData } = await supabase
-      .from("transactions")
-      .select("category_id,amount,type,occurred_at")
-      .gte("occurred_at", start)
-      .lte("occurred_at", end)
-      .eq("type", "expense");
-
-    if (txData) {
-      const sums: Record<string, number> = {};
-      for (const t of txData) {
-        const key = t.category_id ?? "__uncategorized__";
-        sums[key] = (sums[key] ?? 0) + Number(t.amount);
-      }
-      setSpending(sums);
+    // 3) If no budgets, nothing else to compute
+    if (!allBudgets.length) {
+      setSpending({});
+      setLoading(false);
+      return;
     }
 
+    // 4) All (year, month) pairs present in budgets
+    const pairs = Array.from(
+      new Set(allBudgets.map((b) => `${b.year}-${b.month}`))
+    ).map((k) => {
+      const [y, m] = k.split("-").map(Number);
+      return { year: y, month: m };
+    });
+
+    // Compute a wide date window to fetch transactions once:
+    const minYear = Math.min(...pairs.map((p) => p.year));
+    const minMonth = Math.min(
+      ...pairs.filter((p) => p.year === minYear).map((p) => p.month)
+    );
+    const maxYear = Math.max(...pairs.map((p) => p.year));
+    const maxMonth = Math.max(
+      ...pairs.filter((p) => p.year === maxYear).map((p) => p.month)
+    );
+
+    // Local start of first month (inclusive) → ISO
+    const minStart = new Date(minYear, minMonth - 1, 1);
+    // First day of the month AFTER the max period (exclusive) → ISO
+    const maxExclusive = new Date(maxYear, maxMonth, 1);
+
+    // 5) Pull only expenses across that window, inclusive lower bound, exclusive upper bound
+    const { data: txData, error: txErr } = await supabase
+      .from("transactions")
+      .select("category_id,amount,type,occurred_at")
+      .gte("occurred_at", minStart.toISOString())
+      .lt("occurred_at", maxExclusive.toISOString())
+      .eq("type", "expense");
+
+    const sums: SpendingMap = {};
+    if (!txErr && txData) {
+      for (const t of txData as Array<{
+        category_id: string | null;
+        amount: number;
+        type: string;
+        occurred_at: string;
+      }>) {
+        const d = new Date(t.occurred_at);
+        // Use LOCAL calendar month/year to align with your UI’s budget month/year
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const cat = t.category_id ?? "__uncategorized__";
+        const key = `${y}-${m}-${cat}`;
+        sums[key] = (sums[key] ?? 0) + Number(t.amount || 0);
+      }
+    }
+
+    setSpending(sums);
     setLoading(false);
   }, [supabase]);
 
   useEffect(() => {
     fetchData();
+
+    // also react to manual refetch events fired by the form
+    const refetch = () => fetchData();
+    window.addEventListener("budgets:refetch", refetch);
 
     // realtime: budgets
     const budgetChannel = supabase
@@ -105,6 +153,7 @@ export default function BudgetsPage() {
       .subscribe();
 
     return () => {
+      window.removeEventListener("budgets:refetch", refetch);
       supabase.removeChannel(budgetChannel);
       supabase.removeChannel(txChannel);
     };
@@ -169,7 +218,10 @@ export default function BudgetsPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {budgets.map((b) => {
             const cat = categories.find((c) => c.id === b.category_id);
-            const spent = spending[b.category_id] ?? 0; // NOTE: current-month spend
+            const key = `${b.year}-${b.month}-${
+              b.category_id ?? "__uncategorized__"
+            }`;
+            const spent = spending[key] ?? 0; // period-aware spend
             const pct = Math.min((spent / (b.amount || 1)) * 100, 100);
 
             let barColor = "bg-green-500";
@@ -183,9 +235,16 @@ export default function BudgetsPage() {
             const monthBudgets = budgets
               .filter((x) => x.month === b.month && x.year === b.year)
               .map((x) => ({
-                category: categories.find((c) => c.id === x.category_id)?.name ?? "Uncategorized",
+                category:
+                  categories.find((c) => c.id === x.category_id)?.name ??
+                  "Uncategorized",
                 planned: Number(x.amount) || 0,
-                actual: Number(spending[x.category_id] ?? 0),
+                actual:
+                  spending[
+                    `${x.year}-${x.month}-${
+                      x.category_id ?? "__uncategorized__"
+                    }`
+                  ] ?? 0,
               }));
 
             return (
@@ -196,7 +255,9 @@ export default function BudgetsPage() {
                       <>
                         <span
                           className="inline-block h-3 w-3 rounded-full"
-                          style={{ backgroundColor: cat.color ?? "#9ca3af" }}
+                          style={{
+                            backgroundColor: cat.color ?? "#9ca3af",
+                          }}
                           aria-label={`Category color ${cat.color ?? "gray"}`}
                         />
                         {cat.name}
