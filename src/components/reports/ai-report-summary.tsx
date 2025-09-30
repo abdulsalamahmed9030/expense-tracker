@@ -15,7 +15,37 @@ type Props = {
   net: number;
   count: number;
   className?: string;
+  currency?: string; // defaults to INR
+  locale?: string;   // defaults to en-IN
 };
+
+type SummarizeRequest = {
+  from: string;
+  to: string;
+  income: number;
+  expense: number;
+  net: number;
+  count: number;
+  currency: string;
+  locale: string;
+};
+
+type SummarizeResponse = {
+  ok: boolean;
+  summary?: string;
+  error?: string;
+};
+
+function normalizeCurrencyToINR(text: string): string {
+  if (!text) return text;
+
+  let out = text.replace(/\bUSD\b/gi, "INR");
+  out = out.replace(/\bUS\$\s?/gi, "₹");
+  out = out.replace(/(\$)\s?(?=\d)/g, "₹");
+  out = out.replace(/\bRs\.?\s?(?=\d)/gi, "₹");
+
+  return out;
+}
 
 export default function AIReportSummary({
   from,
@@ -25,6 +55,8 @@ export default function AIReportSummary({
   net,
   count,
   className,
+  currency = "INR",
+  locale = "en-IN",
 }: Props) {
   const [loading, setLoading] = React.useState(false);
   const [summary, setSummary] = React.useState<string>("");
@@ -32,9 +64,22 @@ export default function AIReportSummary({
   async function run() {
     setLoading(true);
     try {
-      const res = await summarizeReportAction({ from, to, income, expense, net, count });
+      const payload: SummarizeRequest = {
+        from,
+        to,
+        income,
+        expense,
+        net,
+        count,
+        currency,
+        locale,
+      };
+
+      const res: SummarizeResponse = await summarizeReportAction(payload);
+
       if (res.ok) {
-        setSummary(res.summary);
+        const coerced = normalizeCurrencyToINR(res.summary ?? "");
+        setSummary(coerced);
         toast.success("AI summary generated");
       } else {
         toast.error(res.error || "Unable to summarize right now");
