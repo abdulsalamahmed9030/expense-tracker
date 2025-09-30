@@ -9,6 +9,9 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 
+// NEW: AI Coach
+import AICoach from "@/components/budgets/ai-coach";
+
 type Budget = {
   id: string;
   category_id: string;
@@ -166,12 +169,24 @@ export default function BudgetsPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {budgets.map((b) => {
             const cat = categories.find((c) => c.id === b.category_id);
-            const spent = spending[b.category_id] ?? 0;
-            const pct = Math.min((spent / b.amount) * 100, 100);
+            const spent = spending[b.category_id] ?? 0; // NOTE: current-month spend
+            const pct = Math.min((spent / (b.amount || 1)) * 100, 100);
 
             let barColor = "bg-green-500";
             if (spent > b.amount) barColor = "bg-red-500";
             else if (pct > 80) barColor = "bg-amber-500";
+
+            // Show coach if overspent or >=80%
+            const isHot = spent > b.amount || pct >= 80;
+
+            // Build the monthly budgets payload for the coach (same month/year as this card)
+            const monthBudgets = budgets
+              .filter((x) => x.month === b.month && x.year === b.year)
+              .map((x) => ({
+                category: categories.find((c) => c.id === x.category_id)?.name ?? "Uncategorized",
+                planned: Number(x.amount) || 0,
+                actual: Number(spending[x.category_id] ?? 0),
+              }));
 
             return (
               <Card key={b.id} className="space-y-2 p-4">
@@ -214,6 +229,17 @@ export default function BudgetsPage() {
                   <EditBudgetModal budget={b} />
                   <DeleteBudgetButton id={b.id} />
                 </div>
+
+                {/* NEW: AI Coach appears when the budget is hot */}
+                {isHot && (
+                  <AICoach
+                    className="pt-2"
+                    month={b.month}
+                    year={b.year}
+                    budgets={monthBudgets}
+                    // compact // uncomment if you prefer plain text instead of a Card
+                  />
+                )}
               </Card>
             );
           })}
